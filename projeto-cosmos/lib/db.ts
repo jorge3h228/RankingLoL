@@ -1,10 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import type { Player, PlayerRow, TopChampion } from '@/types';
 
+// Inicializa banco de dados SQLite na raiz do projeto
 const dbPath = path.join(process.cwd(), 'ranking.db');
 const db = new Database(dbPath);
 
-// Cria a tabela de jogadores se não existir
+/**
+ * Cria tabela players se não existir
+ * Contém todos os campos necessários para stats completos
+ * UNIQUE(game_name, tag_line) impede duplicatas
+ */
 db.exec(`
   CREATE TABLE IF NOT EXISTS players (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,65 +22,114 @@ db.exec(`
     league_points INTEGER DEFAULT 0,
     wins INTEGER DEFAULT 0,
     losses INTEGER DEFAULT 0,
+    kills REAL DEFAULT 0,
+    deaths REAL DEFAULT 0,
+    assists REAL DEFAULT 0,
+    cs INTEGER DEFAULT 0,
+    vision_score INTEGER DEFAULT 0,
+    top_champions TEXT DEFAULT '[]',
+    total_lp_gained INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(game_name, tag_line)
   )
 `);
 
-export interface Player {
-  id?: number;
-  game_name: string;
-  tag_line: string;
-  puuid?: string;
-  tier?: string;
-  rank?: string;
-  league_points?: number;
-  wins?: number;
-  losses?: number;
-  created_at?: string;
-  updated_at?: string;
-}
+// Re-exporta tipos para retrocompatibilidade
+export type { TopChampion, Player, PlayerRow } from '@/types';
 
-// ===== CRUD OPERATIONS =====
+// ===== OPERAÇÕES CRUD =====
 
-// Adicionar jogador
+/**
+ * Adiciona novo jogador ao banco
+ * Gera PUUID mock se não fornecido
+ */
 export function addPlayer(player: Omit<Player, 'id' | 'created_at' | 'updated_at'>) {
   const stmt = db.prepare(`
-    INSERT INTO players (game_name, tag_line, puuid, tier, rank, league_points, wins, losses)
-    VALUES (@game_name, @tag_line, @puuid, @tier, @rank, @league_points, @wins, @losses)
+    INSERT INTO players (game_name, tag_line, puuid, tier, rank, league_points, wins, losses, kills, deaths, assists, cs, vision_score, top_champions, total_lp_gained)
+    VALUES (@game_name, @tag_line, @puuid, @tier, @rank, @league_points, @wins, @losses, @kills, @deaths, @assists, @cs, @vision_score, @top_champions, @total_lp_gained)
   `);
   
   const result = stmt.run({
     game_name: player.game_name,
     tag_line: player.tag_line,
-    puuid: player.puuid || null,
+    puuid: player.puuid || `MOCK-PUUID-${Date.now()}`,
     tier: player.tier || 'UNRANKED',
     rank: player.rank || '',
     league_points: player.league_points || 0,
     wins: player.wins || 0,
     losses: player.losses || 0,
+    kills: player.kills || 0,
+    deaths: player.deaths || 0,
+    assists: player.assists || 0,
+    cs: player.cs || 0,
+    vision_score: player.vision_score || 0,
+    top_champions: JSON.stringify(player.top_champions || []),
+    total_lp_gained: player.total_lp_gained || 0,
   });
 
   return result.lastInsertRowid;
 }
 
-// Listar todos os jogadores
+/**
+ * Lista todos os jogadores ordenados por LP (decrescente)
+ * Parseia JSON dos campeões automaticamente
+ */
 export function getAllPlayers(): Player[] {
   const stmt = db.prepare('SELECT * FROM players ORDER BY league_points DESC');
-  return stmt.all() as Player[];
+  const players = stmt.all() as PlayerRow[];
+  
+  return players.map(({ top_champions, ...player }) => ({
+    ...player,
+    kda: {
+      kills: player.kills || 0,
+      deaths: player.deaths || 0,
+      assists: player.assists || 0
+    },
+    topChampions: JSON.parse(top_champions || '[]') as TopChampion[],
+    visionScore: player.vision_score,
+    totalLPGained: player.total_lp_gained
+  }));
 }
 
 // Buscar jogador por ID
 export function getPlayerById(id: number): Player | undefined {
   const stmt = db.prepare('SELECT * FROM players WHERE id = ?');
-  return stmt.get(id) as Player | undefined;
+  const row = stmt.get(id) as PlayerRow | undefined;
+  if (!row) return undefined;
+  
+  const { top_champions, ...player } = row;
+  return {
+    ...player,
+    kda: {
+      kills: player.kills || 0,
+      deaths: player.deaths || 0,
+      assists: player.assists || 0
+    },
+    topChampions: JSON.parse(top_champions || '[]') as TopChampion[],
+    visionScore: player.vision_score,
+    totalLPGained: player.total_lp_gained
+  };
 }
 
 // Buscar jogador por nome e tag
 export function getPlayerByNameTag(gameName: string, tagLine: string): Player | undefined {
   const stmt = db.prepare('SELECT * FROM players WHERE game_name = ? AND tag_line = ?');
-  return stmt.get(gameName, tagLine) as Player | undefined;
+  const row = stmt.get(gameName, tagLine) as PlayerRow | undefined;
+  if (!row) return undefined;
+  
+  const { top_champions, ...player } = row;
+  return {
+    ...player,
+    kda: {
+      kills: player.kills || 0,
+      deaths: player.deaths || 0,
+      assists: player.assists || 0
+    },
+    topChampions: JSON.parse(top_champions || '[]') as TopChampion[],
+    visionScore: player.vision_score,
+    totalLPGained: player.total_lp_gained
+  };
 }
 
 // Atualizar jogador

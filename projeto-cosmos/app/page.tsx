@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Orbitron, Space_Mono } from "next/font/google";
 
@@ -24,17 +24,28 @@ interface Player {
   league_points?: number;
   wins?: number;
   losses?: number;
+  kda?: {
+    kills: number;
+    deaths: number;
+    assists: number;
+  };
+  cs?: number;
+  visionScore?: number;
+  topChampions?: Array<{
+    championId: string;
+    championName: string;
+    championIcon: string;
+    games: number;
+    winRate: number;
+  }>;
+  totalLPGained?: number;
 }
 
 export default function Home() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [mockMode, setMockMode] = useState(false);
 
-  useEffect(() => {
-    loadPlayers();
-  }, []);
-
-  async function loadPlayers() {
+  const loadPlayers = useCallback(async () => {
     try {
       const res = await fetch('/api/players');
       const data = await res.json();
@@ -43,7 +54,31 @@ export default function Home() {
     } catch (error) {
       console.error('Erro ao carregar jogadores:', error);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadPlayers();
+  }, [loadPlayers]);
+
+  // Gera posições das estrelas uma vez
+  const stars = useMemo(() => {
+    // Gera valores aleatórios fora do render
+    const generateStars = () => {
+      const starArray = [];
+      for (let i = 0; i < 60; i++) {
+        starArray.push({
+          id: i,
+          left: Math.random() * 100,
+          top: Math.random() * 100,
+          animation: Math.floor(Math.random() * 3),
+          animationDuration: 2 + Math.random() * 3,
+          animationDelay: Math.random() * 5
+        });
+      }
+      return starArray;
+    };
+    return generateStars();
+  }, []);
 
   const sortedPlayers = [...players].sort((a, b) => (b.league_points || 0) - (a.league_points || 0));
 
@@ -69,7 +104,46 @@ export default function Home() {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-10px); }
         }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.3; }
+          50% { opacity: 1; }
+        }
+        @keyframes twinkle2 {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.2; }
+        }
+        @keyframes twinkle3 {
+          0%, 100% { opacity: 0.7; }
+          50% { opacity: 0.3; }
+        }
+        .star {
+          position: absolute;
+          width: 2px;
+          height: 2px;
+          background: white;
+          border-radius: 50%;
+          box-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+        }
       `}</style>
+
+      {/* Estrelas de fundo */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", overflow: "hidden", zIndex: 0 }}>
+        {stars.map((star) => {
+          const animations = ['twinkle', 'twinkle2', 'twinkle3'];
+          return (
+            <div
+              key={star.id}
+              className="star"
+              style={{
+                left: `${star.left}%`,
+                top: `${star.top}%`,
+                animation: `${animations[star.animation]} ${star.animationDuration}s infinite`,
+                animationDelay: `${star.animationDelay}s`
+              }}
+            />
+          );
+        })}
+      </div>
       
       <div style={{ maxWidth: 1000, margin: "0 auto", position: "relative", zIndex: 1 }}>
         
@@ -192,8 +266,7 @@ export default function Home() {
                   key={player.id}
                   style={{
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    flexDirection: "column",
                     padding: 18,
                     background: index === 0 
                       ? "linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%)" 
@@ -208,43 +281,214 @@ export default function Home() {
                       : "none",
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "translateX(8px)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow = "0 4px 20px rgba(168, 85, 247, 0.4)";
                     e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.6)";
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "translateX(0)";
+                    e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = index === 0 ? "0 4px 20px rgba(168, 85, 247, 0.3)" : "none";
                     e.currentTarget.style.borderColor = index === 0 ? "rgba(168, 85, 247, 0.6)" : "rgba(168, 85, 247, 0.2)";
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
-                    <span style={{ 
-                      fontSize: 26, 
-                      fontWeight: 900, 
-                      color: index === 0 ? "#a855f7" : "#9333ea",
-                      minWidth: 45,
-                      textShadow: index === 0 ? "0 0 10px rgba(168, 85, 247, 0.5)" : "none"
-                    }}>
-                      #{index + 1}
-                    </span>
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "#f3e8ff", fontFamily: spaceMono.style.fontFamily }}>
-                        {player.game_name}#{player.tag_line}
+                  {/* Linha 1: Posição, Nome, Tier/Rank, LP */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 16,
+                    paddingBottom: 16,
+                    borderBottom: "1px solid rgba(168, 85, 247, 0.2)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
+                      <span style={{ 
+                        fontSize: 26, 
+                        fontWeight: 900, 
+                        color: index === 0 ? "#a855f7" : "#9333ea",
+                        minWidth: 45,
+                        textShadow: index === 0 ? "0 0 10px rgba(168, 85, 247, 0.5)" : "none"
+                      }}>
+                        #{index + 1}
+                      </span>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: "#f3e8ff", fontFamily: spaceMono.style.fontFamily }}>
+                          {player.game_name}#{player.tag_line}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#c4b5fd", marginTop: 2 }}>
+                          {player.tier} {player.rank}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 14, color: "#c4b5fd", marginTop: 4 }}>
-                        {player.tier} {player.rank} • {player.league_points} LP
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: index === 0 ? "#a855f7" : "#9333ea" }}>
+                        {player.league_points} LP
+                      </div>
+                      <div style={{ fontSize: 12, color: "#ec4899", marginTop: 4, fontWeight: 600 }}>
+                        {player.totalLPGained ? (
+                          <>
+                            {player.totalLPGained > 0 ? "+" : ""}{player.totalLPGained} PDL
+                          </>
+                        ) : (
+                          "—"
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 14, color: "#86efac", fontWeight: 600 }}>
-                        {player.wins}V
+                  {/* Linha 2: Top 3 Campeões */}
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    marginBottom: 16,
+                    paddingBottom: 16,
+                    borderBottom: "1px solid rgba(168, 85, 247, 0.2)"
+                  }}>
+                    <span style={{ fontSize: 12, color: "#a855f7", fontWeight: 700, minWidth: 80 }}>
+                      TOP CAMPEÕES
+                    </span>
+                    <div style={{ display: "flex", gap: 10, flex: 1 }}>
+                      {player.topChampions && player.topChampions.length > 0 ? (
+                        player.topChampions.slice(0, 3).map((champ, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: 4
+                            }}
+                          >
+                            {/* Placeholder para ícone do campeão */}
+                            <div
+                              style={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: 8,
+                                background: champ.championIcon || "linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%)",
+                                border: "2px solid rgba(168, 85, 247, 0.4)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 24,
+                                overflow: "hidden"
+                              }}
+                            >
+                              {champ.championIcon ? (
+                                <img
+                                  src={champ.championIcon}
+                                  alt={champ.championName}
+                                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                />
+                              ) : (
+                                "?"
+                              )}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#c4b5fd", textAlign: "center", fontWeight: 600 }}>
+                              {champ.winRate}%
+                            </div>
+                            <div style={{ fontSize: 10, color: "#9333ea" }}>
+                              {champ.games}J
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ color: "#9333ea", fontSize: 12 }}>
+                          Sem dados
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Linha 3: Estatísticas (KDA, CS, Vision Score, Vitórias/Derrotas) */}
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                    gap: 12
+                  }}>
+                    {/* KDA */}
+                    <div style={{
+                      background: "rgba(139, 92, 246, 0.1)",
+                      padding: 12,
+                      borderRadius: 8,
+                      border: "1px solid rgba(168, 85, 247, 0.2)",
+                      textAlign: "center"
+                    }}>
+                      <div style={{ fontSize: 11, color: "#a855f7", fontWeight: 700, marginBottom: 6 }}>
+                        KDA
                       </div>
-                      <div style={{ fontSize: 14, color: "#fca5a5", fontWeight: 600 }}>
-                        {player.losses}D
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f3e8ff" }}>
+                        {player.kda ? `${player.kda.kills}/${player.kda.deaths}/${player.kda.assists}` : "—"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#9333ea", marginTop: 4 }}>
+                        {player.kda ? ((player.kda.kills + player.kda.assists) / Math.max(player.kda.deaths, 1)).toFixed(2) : "0.00"} KDA
+                      </div>
+                    </div>
+
+                    {/* CS */}
+                    <div style={{
+                      background: "rgba(236, 72, 153, 0.1)",
+                      padding: 12,
+                      borderRadius: 8,
+                      border: "1px solid rgba(236, 72, 153, 0.2)",
+                      textAlign: "center"
+                    }}>
+                      <div style={{ fontSize: 11, color: "#ec4899", fontWeight: 700, marginBottom: 6 }}>
+                        CS
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f3e8ff" }}>
+                        {player.cs || "—"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#9333ea", marginTop: 4 }}>
+                        Minions abatidos
+                      </div>
+                    </div>
+
+                    {/* Vision Score */}
+                    <div style={{
+                      background: "rgba(139, 92, 246, 0.1)",
+                      padding: 12,
+                      borderRadius: 8,
+                      border: "1px solid rgba(168, 85, 247, 0.2)",
+                      textAlign: "center"
+                    }}>
+                      <div style={{ fontSize: 11, color: "#a855f7", fontWeight: 700, marginBottom: 6 }}>
+                        VISÃO
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#f3e8ff" }}>
+                        {player.visionScore || "—"}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#9333ea", marginTop: 4 }}>
+                        Vision Score
+                      </div>
+                    </div>
+
+                    {/* Vitórias/Derrotas */}
+                    <div style={{
+                      background: "rgba(139, 92, 246, 0.1)",
+                      padding: 12,
+                      borderRadius: 8,
+                      border: "1px solid rgba(168, 85, 247, 0.2)",
+                      textAlign: "center"
+                    }}>
+                      <div style={{ fontSize: 11, color: "#a855f7", fontWeight: 700, marginBottom: 6 }}>
+                        TAXA
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-around", gap: 4 }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#86efac" }}>
+                            {player.wins}
+                          </div>
+                          <div style={{ fontSize: 10, color: "#86efac" }}>V</div>
+                        </div>
+                        <div style={{ color: "#9333ea" }}>|</div>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#fca5a5" }}>
+                            {player.losses}
+                          </div>
+                          <div style={{ fontSize: 10, color: "#fca5a5" }}>D</div>
+                        </div>
                       </div>
                     </div>
                   </div>

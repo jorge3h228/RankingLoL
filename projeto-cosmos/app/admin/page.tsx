@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -25,11 +25,7 @@ export default function AdminPanel() {
   const [checking, setChecking] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  async function checkAuth() {
+  const checkAuth = useCallback(async () => {
     const token = localStorage.getItem('adminToken');
     if (!token) {
       router.push('/admin/login');
@@ -54,11 +50,15 @@ export default function AdminPanel() {
       setIsAuthenticated(true);
       setChecking(false);
       loadPlayers();
-    } catch (error) {
+    } catch {
       localStorage.removeItem('adminToken');
       router.push('/admin/login');
     }
-  }
+  }, [router]);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   function handleLogout() {
     localStorage.removeItem('adminToken');
@@ -71,8 +71,8 @@ export default function AdminPanel() {
       const data = await res.json();
       setPlayers(data.players || []);
       setMockMode(data.mockMode);
-    } catch (error) {
-      console.error('Erro ao carregar jogadores:', error);
+    } catch {
+      console.error('Erro ao carregar jogadores');
     }
   }
 
@@ -119,7 +119,7 @@ export default function AdminPanel() {
       setTagLine("");
       
       await loadPlayers();
-    } catch (error) {
+    } catch {
       setMessage("❌ Erro ao adicionar jogador");
     } finally {
       setLoading(false);
@@ -152,7 +152,7 @@ export default function AdminPanel() {
 
       setMessage("🗑️ Jogador removido com sucesso!");
       await loadPlayers();
-    } catch (error) {
+    } catch {
       setMessage("❌ Erro ao remover jogador");
     }
   }

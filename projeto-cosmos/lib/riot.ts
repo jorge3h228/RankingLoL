@@ -21,7 +21,7 @@ async function riotFetch(url: string, init: RequestInit = {}) {
 
   if (res.status === 429) {
     const retryAfter = res.headers.get('Retry-After') || '1';
-    const err: any = new Error(`Rate limited. Retry after ${retryAfter}s`);
+    const err = new Error(`Rate limited. Retry after ${retryAfter}s`) as Error & { retryAfter?: number; status?: number };
     err.retryAfter = Number(retryAfter);
     err.status = 429;
     throw err;
@@ -29,7 +29,7 @@ async function riotFetch(url: string, init: RequestInit = {}) {
 
   if (!res.ok) {
     const text = await res.text();
-    const err: any = new Error(`Riot API error ${res.status}: ${text}`);
+    const err = new Error(`Riot API error ${res.status}: ${text}`) as Error & { status?: number };
     err.status = res.status;
     throw err;
   }

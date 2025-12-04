@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function AdminLogin() {
   const [password, setPassword] = useState("");
@@ -29,7 +30,7 @@ export default function AdminLogin() {
       } else {
         setError(data.error || 'Senha incorreta');
       }
-    } catch (error) {
+    } catch {
       setError('Erro ao fazer login');
     } finally {
       setLoading(false);
@@ -149,7 +150,7 @@ export default function AdminLogin() {
           fontSize: 13,
           color: "#718096"
         }}>
-          <a 
+          <Link 
             href="/" 
             style={{ 
               color: "#667eea", 
@@ -160,7 +161,7 @@ export default function AdminLogin() {
             onMouseOut={(e) => e.currentTarget.style.textDecoration = "none"}
           >
             ← Voltar ao Ranking
-          </a>
+          </Link>
         </div>
 
       </div>

@@ -8,8 +8,9 @@ export async function GET() {
   try {
     const players = getAllPlayers();
     return NextResponse.json({ players, mockMode: __mockMode });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erro ao buscar jogadores';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -25,20 +26,43 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { gameName, tagLine } = await req.json();
+    const body = await req.json();
+    const {
+      game_name,
+      gameName,
+      tag_line,
+      tagLine,
+      puuid,
+      tier = 'UNRANKED',
+      rank = '',
+      league_points = 0,
+      wins = 0,
+      losses = 0,
+      kills = 0,
+      deaths = 0,
+      assists = 0,
+      cs = 0,
+      vision_score = 0,
+      topChampions = [],
+      total_lp_gained = 0
+    } = body;
 
-    if (!gameName || !tagLine) {
+    // Suporta ambos os formatos de nomenclatura
+    const playerName = game_name || gameName;
+    const playerTag = tag_line || tagLine;
+
+    if (!playerName || !playerTag) {
       return NextResponse.json(
-        { error: 'gameName e tagLine são obrigatórios' },
+        { error: 'gameName/game_name e tagLine/tag_line são obrigatórios' },
         { status: 400 }
       );
     }
 
     // Normaliza tagLine (remove # se tiver)
-    const normalizedTag = tagLine.replace('#', '');
+    const normalizedTag = playerTag.replace('#', '');
 
     // Verifica se já existe
-    const existing = getPlayerByNameTag(gameName, normalizedTag);
+    const existing = getPlayerByNameTag(playerName, normalizedTag);
     if (existing) {
       return NextResponse.json(
         { error: 'Jogador já cadastrado no ranking' },
@@ -49,27 +73,33 @@ export async function POST(req: NextRequest) {
     // Busca dados da Riot API (funcionará em mock mode ou real)
     let accountData;
     try {
-      accountData = await getAccountByRiotId(gameName, normalizedTag);
-    } catch (error: any) {
-      // Se a API falhar, cadastra com dados mínimos
+      accountData = await getAccountByRiotId(playerName, normalizedTag);
+    } catch {
+      // Se a API falhar, usa os dados fornecidos ou valores default
       accountData = {
-        gameName,
+        gameName: playerName,
         tagLine: normalizedTag,
-        puuid: null,
+        puuid: puuid,
       };
     }
 
-    // TODO: Buscar dados de ranked quando tiver a API key configurada
-    // Por enquanto, cadastra com dados default
+    // Adiciona o jogador com todos os campos
     const playerId = addPlayer({
-      game_name: accountData.gameName || gameName,
+      game_name: accountData.gameName || playerName,
       tag_line: accountData.tagLine || normalizedTag,
-      puuid: accountData.puuid,
-      tier: 'UNRANKED',
-      rank: '',
-      league_points: 0,
-      wins: 0,
-      losses: 0,
+      puuid: accountData.puuid || puuid,
+      tier,
+      rank,
+      league_points,
+      wins,
+      losses,
+      kills,
+      deaths,
+      assists,
+      cs,
+      vision_score,
+      top_champions: topChampions,
+      total_lp_gained,
     });
 
     return NextResponse.json({
@@ -78,8 +108,9 @@ export async function POST(req: NextRequest) {
       message: 'Jogador adicionado com sucesso!',
       mockMode: __mockMode,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erro ao adicionar jogador';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -104,7 +135,8 @@ export async function DELETE(req: NextRequest) {
 
     deletePlayer(Number(id));
     return NextResponse.json({ success: true, message: 'Jogador removido' });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erro ao remover jogador';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

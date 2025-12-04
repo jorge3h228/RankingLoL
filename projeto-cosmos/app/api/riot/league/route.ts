@@ -11,7 +11,8 @@ export async function GET(req: Request) {
   try {
     const data = await getLeagueEntries(queue, tier, division, platform);
     return NextResponse.json(data);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: err.status || 500 });
+  } catch (err: unknown) {
+    const error = err as Error & { status?: number };
+    return NextResponse.json({ error: error.message }, { status: error.status || 500 });
   }
 }
